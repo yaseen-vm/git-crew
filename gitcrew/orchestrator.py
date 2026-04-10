@@ -6,16 +6,13 @@ LangGraph is used, and it earns that choice by doing what LangGraph is
 actually good at: stateful, conditional, multi-step pipelines.
 
 Graph topology:
-  START → classify → security_review → architecture_review → performance_review → aggregate → END
-
-Each node receives the full ReviewState dict, mutates a subset of its keys,
-and returns the delta. LangGraph merges the delta back into state automatically.
+  START → classify → run_all_crews → aggregate → END
 
 Key design decisions:
   - classify() sets boolean flags (run_security, run_architecture, run_performance).
-    The review nodes check their own flag and return empty strings if False.
-    This keeps the graph topology simple (always linear) while still being
-    intelligent about what to skip.
+
+  - run_all_crews() runs all enabled crews in parallel using ThreadPoolExecutor,
+    reducing total review time from 3× sequential to 1× max-crew-time.
 
   - The diff_text stored in state is already formatted (format_hunks_for_review).
     Raw hunks are never stored in state because TypedDict values must be
@@ -25,7 +22,7 @@ Key design decisions:
     abort the whole review.
 """
 
-import os
+from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Optional
 from typing_extensions import TypedDict
 
@@ -55,7 +52,7 @@ class ReviewState(TypedDict):
     run_architecture: bool    # whether to run the Architecture Crew
     run_performance: bool     # whether to run the Performance Crew
 
-    # ── Set by review nodes ──────────────────────────────────────────────────
+    # ── Set by run_all_crews node ────────────────────────────────────────────
     security_findings: str
     architecture_findings: str
     performance_findings: str
@@ -74,13 +71,9 @@ def classify(state: ReviewState) -> dict:
     Parse the raw diff and decide which specialist crews to run.
 
     Routing logic:
-      - docs-only diff       → skip all crews (nothing to review)
-      - security-sensitive files → always run security crew
-      - non-trivial code diff → run all three crews
-      - trivial diff (<5 lines added) → still run all, crews will find little
-
-    Sets: formatted_diff, files_changed, languages, has_security_files,
-          is_docs_only, run_security, run_architecture, run_performance
+      - docs-only diff            → skip all crews (nothing to review)
+      - security-sensitive files  → always run security crew
+      - any other code diff       → run all three crews
     """
     diff_text = state["diff_text"]
 
@@ -91,12 +84,10 @@ def classify(state: ReviewState) -> dict:
     is_docs_only: bool = summary["is_docs_only"]
     has_security: bool = summary["has_security_files"]
 
-    # Always run all crews on real code; skip only for pure doc changes
     run_security = not is_docs_only
     run_architecture = not is_docs_only
     run_performance = not is_docs_only
 
-    # Force security crew if security-sensitive files changed, even if borderline
     if has_security:
         run_security = True
 
@@ -112,43 +103,47 @@ def classify(state: ReviewState) -> dict:
     }
 
 
-def security_review(state: ReviewState) -> dict:
-    """Call the CrewAI Security Crew. Skipped if run_security is False."""
-    if not state["run_security"]:
-        return {"security_findings": ""}
+def run_all_crews(state: ReviewState) -> dict:
+    """
+    Run all enabled CrewAI crews in parallel using ThreadPoolExecutor.
 
-    try:
-        findings = run_security_crew(state["formatted_diff"])
-    except Exception as e:
-        findings = f"⚠️ Security crew failed: {e}"
+    Sequential execution (old): total time ≈ t_security + t_architecture + t_performance
+    Parallel execution (now):   total time ≈ max(t_security, t_architecture, t_performance)
 
-    return {"security_findings": findings}
+    Each crew is wrapped in try/except — a single failure returns a warning string
+    and does not abort the other crews or the overall review.
+    """
+    results = {
+        "security_findings": "",
+        "architecture_findings": "",
+        "performance_findings": "",
+    }
 
+    if state["is_docs_only"]:
+        return results
 
-def architecture_review(state: ReviewState) -> dict:
-    """Call the CrewAI Architecture Crew. Skipped if run_architecture is False."""
-    if not state["run_architecture"]:
-        return {"architecture_findings": ""}
+    formatted = state["formatted_diff"]
 
-    try:
-        findings = run_architecture_crew(state["formatted_diff"])
-    except Exception as e:
-        findings = f"⚠️ Architecture crew failed: {e}"
+    crew_map: dict[str, tuple] = {}
+    if state["run_security"]:
+        crew_map["security"] = (run_security_crew, formatted)
+    if state["run_architecture"]:
+        crew_map["architecture"] = (run_architecture_crew, formatted)
+    if state["run_performance"]:
+        crew_map["performance"] = (run_performance_crew, formatted)
 
-    return {"architecture_findings": findings}
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures: dict[str, Future] = {
+            key: executor.submit(fn, arg)
+            for key, (fn, arg) in crew_map.items()
+        }
+        for key, future in futures.items():
+            try:
+                results[f"{key}_findings"] = future.result()
+            except Exception as e:
+                results[f"{key}_findings"] = f"⚠️ {key.title()} crew failed: {e}"
 
-
-def performance_review(state: ReviewState) -> dict:
-    """Call the CrewAI Performance Crew. Skipped if run_performance is False."""
-    if not state["run_performance"]:
-        return {"performance_findings": ""}
-
-    try:
-        findings = run_performance_crew(state["formatted_diff"])
-    except Exception as e:
-        findings = f"⚠️ Performance crew failed: {e}"
-
-    return {"performance_findings": findings}
+    return results
 
 
 def aggregate(state: ReviewState) -> dict:
@@ -157,17 +152,16 @@ def aggregate(state: ReviewState) -> dict:
 
     Structure:
       # Git-Crew Review Report
-      ## Summary table
+      ## Summary table (severity counts)
       ## 🔒 Security Findings
       ## 🏗️ Architecture Findings
       ## ⚡ Performance Findings
-      ## What Changed (file list)
+      ## 📁 Files Changed
     """
     pr_label = f"PR #{state['pr_number']}" if state.get("pr_number") else "local diff"
     langs = ", ".join(state["languages"]) if state["languages"] else "Unknown"
     files = state["files_changed"]
 
-    # Count issues by scanning for severity labels in findings
     def count_label(text: str, label: str) -> int:
         return text.upper().count(f"[{label}]") + text.upper().count(f"**{label}**")
 
@@ -246,23 +240,18 @@ def build_graph() -> StateGraph:
     """
     Build and compile the LangGraph review pipeline.
 
-    Returns a compiled graph ready for .invoke() or .stream().
-    The graph is built once at module import and reused for all reviews.
+    Topology: classify → run_all_crews (parallel) → aggregate
     """
     g = StateGraph(ReviewState)
 
-    g.add_node("classify",             classify)
-    g.add_node("security_review",      security_review)
-    g.add_node("architecture_review",  architecture_review)
-    g.add_node("performance_review",   performance_review)
-    g.add_node("aggregate",            aggregate)
+    g.add_node("classify",       classify)
+    g.add_node("run_all_crews",  run_all_crews)
+    g.add_node("aggregate",      aggregate)
 
     g.set_entry_point("classify")
-    g.add_edge("classify",            "security_review")
-    g.add_edge("security_review",     "architecture_review")
-    g.add_edge("architecture_review", "performance_review")
-    g.add_edge("performance_review",  "aggregate")
-    g.add_edge("aggregate",           END)
+    g.add_edge("classify",      "run_all_crews")
+    g.add_edge("run_all_crews", "aggregate")
+    g.add_edge("aggregate",     END)
 
     return g.compile()
 
@@ -275,23 +264,12 @@ def run_review(diff_text: str, repo_path: str = ".", pr_number: int | None = Non
     """
     Run the full review pipeline on a diff string.
 
-    Args:
-        diff_text:   Raw output of `git diff` or `gh pr diff`
-        repo_path:   Root of the repository (used for context display)
-        pr_number:   PR number if reviewing a GitHub PR
-
-    Returns:
-        Final ReviewState with all findings and the assembled final_report.
-
-    Usage:
-        state = run_review(diff_text)
-        print(state["final_report"])
+    Returns the final ReviewState with all findings and the assembled final_report.
     """
     initial: dict = {
         "diff_text": diff_text,
         "repo_path": repo_path,
         "pr_number": pr_number,
-        # ── defaults for all other fields ──
         "formatted_diff": "",
         "files_changed": [],
         "languages": [],
@@ -314,10 +292,6 @@ def stream_review(diff_text: str, repo_path: str = ".", pr_number: int | None = 
 
     Yields:
         (node_name: str, updated_state: dict) after each node completes.
-
-    Usage:
-        for node_name, state in stream_review(diff_text):
-            print(f"✓ {node_name}")
     """
     initial: dict = {
         "diff_text": diff_text,

@@ -1,8 +1,9 @@
 name: 'git-crew AI Code Reviewer'
 description: >
   Reviews every PR for security vulnerabilities, architecture issues, and performance
-  bottlenecks. Uses LangGraph (orchestration) + CrewAI (3 specialist crews) + Groq LLM.
-  Posts findings as a PR comment.
+  bottlenecks. Uses LangGraph (orchestration) + CrewAI (3 specialist crews, run in
+  parallel) + Groq LLM. Posts findings as a PR comment and optionally uploads SARIF
+  to GitHub Code Scanning.
 
 branding:
   icon: 'shield'
@@ -16,7 +17,7 @@ inputs:
     required: true
   github-token:
     description: >
-      GitHub token used to fetch the PR diff and post the review comment.
+      GitHub token for fetching the PR diff and posting the review comment.
       Defaults to the built-in GITHUB_TOKEN — no extra setup needed.
     required: false
     default: ${{ github.token }}
@@ -24,6 +25,13 @@ inputs:
     description: 'Post the review as a PR comment (true/false). Default: true.'
     required: false
     default: 'true'
+  upload-sarif:
+    description: >
+      Upload a SARIF file to GitHub Code Scanning (true/false).
+      Findings appear in Security → Code scanning with inline annotations.
+      Requires the repository to have Code Scanning enabled.
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -35,7 +43,6 @@ runs:
 
     - name: Install git-crew
       shell: bash
-      # Install from the action's own directory so the version always matches the action tag.
       run: pip install "${{ github.action_path }}"
 
     - name: Run review
@@ -43,12 +50,17 @@ runs:
       env:
         GROQ_API_KEY: ${{ inputs.groq-api-key }}
         GH_TOKEN: ${{ inputs.github-token }}
-        # GH_REPO lets `gh pr diff` find the right repo without a local checkout.
         GH_REPO: ${{ github.repository }}
       run: |
         PR="${{ github.event.pull_request.number }}"
-        if [[ "${{ inputs.post-comment }}" == "true" ]]; then
-          git-crew pr "$PR" --no-interactive --post-comment
-        else
-          git-crew pr "$PR" --no-interactive
-        fi
+        ARGS="--no-interactive"
+        [[ "${{ inputs.post-comment }}" == "true" ]] && ARGS="$ARGS --post-comment"
+        [[ "${{ inputs.upload-sarif }}" == "true" ]] && ARGS="$ARGS --sarif results.sarif"
+        git-crew pr "$PR" $ARGS
+
+    - name: Upload SARIF to GitHub Code Scanning
+      if: inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: results.sarif
+        category: git-crew

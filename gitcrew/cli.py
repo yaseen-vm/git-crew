@@ -41,6 +41,7 @@ from .report import (
     print_skip_notice,
     print_report,
     save_report,
+    save_sarif,
     post_pr_comment,
     print_error,
 )
@@ -83,6 +84,10 @@ def review(
         None, "--output", "-o",
         help="Save the Markdown report to this file.",
     ),
+    sarif: Optional[Path] = typer.Option(
+        None, "--sarif",
+        help="Save a SARIF 2.1.0 file (for GitHub Code Scanning upload).",
+    ),
     no_interactive: bool = typer.Option(
         False, "--no-interactive",
         help="Skip the AutoGen Q&A session after the report.",
@@ -124,6 +129,7 @@ def review(
         repo_path=repo_path,
         pr_number=None,
         output=output,
+        sarif=sarif,
         no_interactive=no_interactive,
     )
 
@@ -136,6 +142,10 @@ def pr(
     output: Optional[Path] = typer.Option(
         None, "--output", "-o",
         help="Save the Markdown report to this file.",
+    ),
+    sarif: Optional[Path] = typer.Option(
+        None, "--sarif",
+        help="Save a SARIF 2.1.0 file (for GitHub Code Scanning upload).",
     ),
     post_comment: bool = typer.Option(
         False, "--post-comment",
@@ -168,6 +178,7 @@ def pr(
         repo_path=".",
         pr_number=pr_number,
         output=output,
+        sarif=sarif,
         no_interactive=no_interactive,
     )
 
@@ -223,6 +234,7 @@ def _run_review_pipeline(
     repo_path: str,
     pr_number: Optional[int],
     output: Optional[Path],
+    sarif: Optional[Path],
     no_interactive: bool,
 ) -> Optional[dict]:
     """
@@ -263,6 +275,9 @@ def _run_review_pipeline(
 
     if output:
         save_report(final_state.get("final_report", ""), output)
+
+    if sarif:
+        save_sarif(final_state, sarif)
 
     # ── Interactive session ───────────────────────────────────────────────────
     if not no_interactive and sys.stdin.isatty():

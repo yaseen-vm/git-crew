@@ -7,6 +7,17 @@ name = "git-crew"
 version = "0.1.0"
 requires-python = ">=3.11"
 readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["git", "code-review", "ai", "llm", "security", "langGraph", "crewai", "autogen"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Security",
+]
 dependencies = [
     "langgraph>=0.2.0",
     "langchain-core>=0.3.0",
@@ -19,9 +30,45 @@ dependencies = [
     "python-dotenv>=1.0.0",
 ]
 
+[project.optional-dependencies]
+dev = ["ruff", "mypy"]
+
 [project.scripts]
 git-crew = "gitcrew.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yaseen-vm/git-crew"
+Repository = "https://github.com/yaseen-vm/git-crew"
+"Bug Tracker" = "https://github.com/yaseen-vm/git-crew/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["gitcrew*"]
+
+# ── Ruff (linter + formatter) ─────────────────────────────────────────────────
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long — handled by formatter
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gitcrew"]
+
+# ── Mypy ──────────────────────────────────────────────────────────────────────
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+no_strict_optional = true
