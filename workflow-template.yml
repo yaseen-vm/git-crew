@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# git-crew AI Code Review — workflow template
+#
+# HOW TO USE:
+#   1. Copy this file to  .github/workflows/git-crew-review.yml  in your repo.
+#   2. Add your Groq API key as a repository secret named GROQ_API_KEY.
+#      (Settings → Secrets and variables → Actions → New repository secret)
+#   3. Replace YOUR_GITHUB_USERNAME with the actual owner of the git-crew repo.
+#   4. Open a PR — git-crew will review it and post findings as a comment.
+#
+# GROQ_API_KEY: free at https://console.groq.com
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  git-crew-review:
+    name: git-crew review
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write  # required to post the review comment
+
+    steps:
+      - name: Review PR with git-crew
+        uses: YOUR_GITHUB_USERNAME/git-crew@main
+        with:
+          groq-api-key: ${{ secrets.GROQ_API_KEY }}
+          # github-token defaults to ${{ github.token }} — no change needed
+          # post-comment defaults to true — remove the comment posting with:
+          # post-comment: 'false'
