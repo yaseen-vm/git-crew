@@ -32,7 +32,6 @@ from .crews.performance_crew import run_performance_crew
 from .crews.security_crew import run_security_crew
 from .git import DiffHunk, diff_summary, format_hunks_for_review, parse_diff
 
-
 # ── State schema ──────────────────────────────────────────────────────────────
 
 class ReviewState(TypedDict):
