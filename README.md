@@ -5,7 +5,7 @@
 [![CI](https://github.com/yaseen-vm/git-crew/actions/workflows/ci.yml/badge.svg)](https://github.com/yaseen-vm/git-crew/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Powered by Groq](https://img.shields.io/badge/LLM-Groq%20%2F%20llama--3.3--70b-orange.svg)](https://console.groq.com)
+[![LLM Providers](https://img.shields.io/badge/LLM-9%20providers-orange.svg)](#llm-providers)
 
 ---
 
@@ -14,7 +14,10 @@
 Most static analysis tools look at your whole codebase — git-crew looks **only at what changed**. It sends the actual diff to three specialist AI crews, each focused on a different failure mode, and gives you a structured report before you push.
 
 ```
-your diff  →  Security Crew  →  Architecture Crew  →  Performance Crew  →  report + Q&A
+your diff  →  classify  →  Security ┐
+                                     ├── (parallel)  →  aggregate  →  report  →  Q&A
+                           Arch    ──┤
+                           Perf    ──┘
 ```
 
 Three frameworks, each used for what it's uniquely good at:
@@ -44,7 +47,7 @@ git-crew pr 42                      # review a GitHub PR
 
 Every PR gets an automatic AI review posted as a comment.
 
-**Step 1** — Add `GROQ_API_KEY` as a repository secret.
+**Step 1** — Add your LLM API key as a repository secret (e.g. `GROQ_API_KEY`).
 (Settings → Secrets and variables → Actions → New repository secret)
 
 **Step 2** — Create `.github/workflows/git-crew-review.yml`:
@@ -63,10 +66,11 @@ jobs:
     steps:
       - uses: yaseen-vm/git-crew@main
         with:
-          groq-api-key: ${{ secrets.GROQ_API_KEY }}
+          llm-provider: 'groq'                      # or openai, anthropic, etc.
+          api-key: ${{ secrets.GROQ_API_KEY }}
 ```
 
-That's it. No server, no hosting. Uses Groq's free tier.
+That's it. No server, no hosting. Groq is free. Swap `llm-provider` and `api-key` to use any supported provider.
 
 ---
 
@@ -198,12 +202,10 @@ Upload to GitHub Code Scanning in your workflow:
 ```yaml
 - uses: yaseen-vm/git-crew@main
   with:
-    groq-api-key: ${{ secrets.GROQ_API_KEY }}
+    llm-provider: 'groq'
+    api-key: ${{ secrets.GROQ_API_KEY }}
     post-comment: 'false'
-
-- uses: github/codeql-action/upload-sarif@v3
-  with:
-    sarif_file: results.sarif
+    upload-sarif: 'true'
 ```
 
 Findings then appear in the **Security → Code scanning** tab with inline annotations.
