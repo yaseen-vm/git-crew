@@ -23,6 +23,7 @@ dependencies = [
     "langchain-core>=0.3.0",
     "langchain-groq>=0.2.0",   # default provider — included for zero-config startup
     "crewai>=0.80.0",
+    "litellm>=1.0.0",          # required by crewai.LLM for non-native providers (groq, mistral, etc.)
     "ag2>=0.11.0",
     "typer>=0.12.0",
     "rich>=13.0.0",
