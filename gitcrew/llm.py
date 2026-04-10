@@ -59,7 +59,8 @@ def _provider() -> str:
 
 def _model(provider: str) -> str:
     default, _ = _PROVIDERS.get(provider, ("gpt-4o", None))
-    return os.environ.get("LLM_MODEL", default)
+    # Use `or default` so an empty LLM_MODEL="" env var falls back to the default
+    return os.environ.get("LLM_MODEL") or default
 
 
 def _require_key(env_var: str, provider: str) -> str:
@@ -155,6 +156,81 @@ def get_langchain_llm(temperature: float = 0.1):
         f"Supported providers: {', '.join(_PROVIDERS)}\n"
         f"Set LLM_PROVIDER in your .env file."
     )
+
+
+# ── CrewAI LLM factory ────────────────────────────────────────────────────────
+# Used by: all three CrewAI crews (agent.llm parameter)
+#
+# CrewAI 1.x uses LiteLLM internally. Agent(llm=...) no longer accepts a
+# LangChain BaseChatModel — it requires a crewai.LLM object or a plain string.
+
+def get_crewai_llm(temperature: float = 0.1):
+    """
+    Return a CrewAI LLM instance for the active LLM_PROVIDER.
+
+    CrewAI 1.x wraps LiteLLM. Model names must use LiteLLM's provider prefix
+    format (e.g. "groq/llama-3.3-70b-versatile", "anthropic/claude-3-5-sonnet-…").
+
+    Raises:
+        OSError: if the required API key is not set
+        ValueError: if LLM_PROVIDER is not a recognised provider
+    """
+    from crewai import LLM
+
+    p = _provider()
+    m = _model(p)
+
+    # LiteLLM provider prefix for each supported provider
+    _PREFIXES: dict[str, str] = {
+        "groq":       "groq/",
+        "openai":     "",          # no prefix — LiteLLM recognises gpt-* natively
+        "anthropic":  "anthropic/",
+        "ollama":     "ollama/",
+        "azure":      "azure/",
+        "mistral":    "mistral/",
+        "google":     "gemini/",   # LiteLLM uses "gemini/" for Google AI Studio
+        "openrouter": "openrouter/",
+        "together":   "together_ai/",
+    }
+
+    if p not in _PREFIXES:
+        raise ValueError(
+            f"Unknown LLM_PROVIDER: {p!r}.\n"
+            f"Supported providers: {', '.join(_PROVIDERS)}\n"
+            f"Set LLM_PROVIDER in your .env file."
+        )
+
+    prefix = _PREFIXES[p]
+    # Avoid double-prefixing if the user already included the provider in LLM_MODEL
+    model_str = m if m.startswith(prefix) else f"{prefix}{m}"
+
+    kwargs: dict = {"model": model_str, "temperature": temperature}
+
+    if p == "groq":
+        kwargs["api_key"] = _require_key("GROQ_API_KEY", p)
+    elif p == "openai":
+        kwargs["api_key"] = _require_key("OPENAI_API_KEY", p)
+    elif p == "anthropic":
+        kwargs["api_key"] = _require_key("ANTHROPIC_API_KEY", p)
+    elif p == "ollama":
+        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+        kwargs["base_url"] = base_url
+    elif p == "azure":
+        kwargs["api_key"] = _require_key("AZURE_OPENAI_API_KEY", p)
+        kwargs["base_url"] = _require_key("AZURE_OPENAI_ENDPOINT", p)
+        kwargs["api_version"] = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01")
+    elif p == "mistral":
+        kwargs["api_key"] = _require_key("MISTRAL_API_KEY", p)
+    elif p == "google":
+        kwargs["api_key"] = _require_key("GOOGLE_API_KEY", p)
+    elif p == "openrouter":
+        kwargs["api_key"] = _require_key("OPENROUTER_API_KEY", p)
+        kwargs["base_url"] = "https://openrouter.ai/api/v1"
+    elif p == "together":
+        kwargs["api_key"] = _require_key("TOGETHER_API_KEY", p)
+        kwargs["base_url"] = "https://api.together.xyz/v1"
+
+    return LLM(**kwargs)
 
 
 # ── AutoGen config factory ─────────────────────────────────────────────────────

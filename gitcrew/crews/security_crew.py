@@ -17,7 +17,7 @@ Public API:
 
 from crewai import Agent, Crew, Task
 
-from ..llm import get_langchain_llm
+from ..llm import get_crewai_llm
 
 
 def run_security_crew(diff_text: str) -> str:
@@ -31,7 +31,7 @@ def run_security_crew(diff_text: str) -> str:
         Structured security findings as a Markdown string.
         Returns a "no issues" message if the crew finds nothing.
     """
-    llm = get_langchain_llm()
+    llm = get_crewai_llm()
 
     # ── Agents ────────────────────────────────────────────────────────────────
 

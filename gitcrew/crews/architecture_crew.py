@@ -17,7 +17,7 @@ Public API:
 
 from crewai import Agent, Crew, Task
 
-from ..llm import get_langchain_llm
+from ..llm import get_crewai_llm
 
 
 def run_architecture_crew(diff_text: str) -> str:
@@ -30,7 +30,7 @@ def run_architecture_crew(diff_text: str) -> str:
     Returns:
         Structured architecture findings as a Markdown string.
     """
-    llm = get_langchain_llm()
+    llm = get_crewai_llm()
 
     # ── Agents ────────────────────────────────────────────────────────────────
 
