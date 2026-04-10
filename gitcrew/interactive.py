@@ -23,43 +23,13 @@ Why AutoGen (not CrewAI or LangGraph) for this:
   pattern designed for this: a human and an AI talking back and forth.
 """
 
-import os
 from typing import Optional
 
 import autogen
 
-
-_STEP_LABELS = {
-    "classify":            "Classifying diff",
-    "security_review":     "Security crew",
-    "architecture_review": "Architecture crew",
-    "performance_review":  "Performance crew",
-    "aggregate":           "Building report",
-}
+from .llm import get_autogen_config
 
 _TERMINATION_PHRASES = {"exit", "done", "quit", "bye", "q", "no", "thanks"}
-
-
-def _get_llm_config() -> dict:
-    """
-    Build AutoGen llm_config using Groq's OpenAI-compatible API.
-    AutoGen natively speaks OpenAI's protocol, so we point it at Groq.
-    """
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        raise EnvironmentError("GROQ_API_KEY is not set. Get a free key at https://console.groq.com")
-
-    return {
-        "config_list": [
-            {
-                "model": "llama-3.3-70b-versatile",
-                "api_key": api_key,
-                "base_url": "https://api.groq.com/openai/v1",
-                "api_type": "openai",
-            }
-        ],
-        "temperature": 0.2,
-    }
 
 
 def _is_termination(msg: dict) -> bool:
@@ -91,7 +61,7 @@ def start_interactive_session(
         diff_text:      Raw git diff text (for the ReviewerAgent's context)
         max_turns:      Maximum conversation turns before auto-terminating
     """
-    llm_config = _get_llm_config()
+    llm_config = get_autogen_config()
 
     system_message = f"""You are a senior code reviewer who just finished analyzing a git diff.
 You have the full review report and the original diff available to you.

@@ -59,11 +59,13 @@ def print_report(final_report: str) -> None:
 
 def print_header(source_label: str, file_count: int) -> None:
     """Print the review header before progress ticks start."""
+    from .llm import describe_active
     console.print()
     header = Text()
     header.append("git-crew", style="bold cyan")
     header.append(f"  reviewing {source_label}", style="dim")
-    header.append(f"  ({file_count} file hint)", style="dim")
+    header.append(f"  ({file_count} files)  ", style="dim")
+    header.append(f"[{describe_active()}]", style="dim yellow")
     console.print(Panel(header, border_style="cyan", padding=(0, 1)))
     console.print()
 

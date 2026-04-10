@@ -3,11 +3,19 @@
 #
 # HOW TO USE:
 #   1. Copy this file to  .github/workflows/git-crew-review.yml  in your repo.
-#   2. Add your Groq API key as a repository secret named GROQ_API_KEY.
+#   2. Add your LLM API key as a repository secret.
 #      (Settings → Secrets and variables → Actions → New repository secret)
-#   3. Open a PR — git-crew will review it and post findings as a comment.
+#   3. Set llm-provider and the matching secret name below.
+#   4. Open a PR — git-crew reviews it and posts findings as a comment.
 #
-# GROQ_API_KEY: free at https://console.groq.com
+# PROVIDER QUICK-START:
+#   Groq (free)   → secret: GROQ_API_KEY       llm-provider: groq
+#   OpenAI        → secret: OPENAI_API_KEY      llm-provider: openai
+#   Anthropic     → secret: ANTHROPIC_API_KEY   llm-provider: anthropic
+#   Mistral       → secret: MISTRAL_API_KEY     llm-provider: mistral
+#   Google        → secret: GOOGLE_API_KEY      llm-provider: google
+#   OpenRouter    → secret: OPENROUTER_API_KEY  llm-provider: openrouter
+#   Ollama        → no key needed               llm-provider: ollama
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: AI Code Review
@@ -23,12 +31,14 @@ jobs:
 
     permissions:
       pull-requests: write      # post review comment
-      security-events: write    # upload SARIF to Code Scanning (optional)
+      security-events: write    # upload SARIF to Code Scanning (if enabled)
 
     steps:
       - name: Review PR with git-crew
         uses: yaseen-vm/git-crew@main
         with:
-          groq-api-key: ${{ secrets.GROQ_API_KEY }}
+          llm-provider: 'groq'                        # change to your provider
+          api-key: ${{ secrets.GROQ_API_KEY }}        # change to matching secret
+          # llm-model: 'llama-3.3-70b-versatile'     # optional model override
           post-comment: 'true'
-          # upload-sarif: 'true'   # uncomment to enable GitHub Code Scanning integration
+          # upload-sarif: 'true'                      # enables GitHub Code Scanning

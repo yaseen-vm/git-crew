@@ -16,16 +16,8 @@ Public API:
   run_performance_crew(diff_text: str) -> str
 """
 
-import os
 from crewai import Agent, Crew, Task
-from langchain_groq import ChatGroq
-
-
-def _get_llm() -> ChatGroq:
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        raise EnvironmentError("GROQ_API_KEY is not set. Get a free key at https://console.groq.com")
-    return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.1, api_key=api_key)
+from ..llm import get_langchain_llm
 
 
 def run_performance_crew(diff_text: str) -> str:
@@ -38,7 +30,7 @@ def run_performance_crew(diff_text: str) -> str:
     Returns:
         Structured performance findings as a Markdown string.
     """
-    llm = _get_llm()
+    llm = get_langchain_llm()
 
     # ── Agents ────────────────────────────────────────────────────────────────
 

@@ -136,6 +136,55 @@ git-crew uninstall-hook                # remove hook
 
 ---
 
+## LLM Providers
+
+git-crew works with any of these providers — swap with two env vars, no code changes.
+
+| Provider | `LLM_PROVIDER` | Key env var | Default model | Free tier |
+|---|---|---|---|---|
+| **Groq** (default) | `groq` | `GROQ_API_KEY` | `llama-3.3-70b-versatile` | ✅ |
+| **OpenAI** | `openai` | `OPENAI_API_KEY` | `gpt-4o` | ❌ |
+| **Anthropic** | `anthropic` | `ANTHROPIC_API_KEY` | `claude-3-5-sonnet-20241022` | ❌ |
+| **Ollama** (local) | `ollama` | _(none)_ | `llama3.3` | ✅ |
+| **Azure OpenAI** | `azure` | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | `gpt-4o` | ❌ |
+| **Mistral** | `mistral` | `MISTRAL_API_KEY` | `mistral-large-latest` | ❌ |
+| **Google (Gemini)** | `google` | `GOOGLE_API_KEY` | `gemini-2.0-flash` | ✅ |
+| **OpenRouter** | `openrouter` | `OPENROUTER_API_KEY` | `openai/gpt-4o` | ✅ credits |
+| **Together AI** | `together` | `TOGETHER_API_KEY` | `meta-llama/Llama-3-70b-chat-hf` | ✅ credits |
+
+**Switch provider** — set two env vars in `.env`:
+```bash
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**Override model:**
+```bash
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=...
+LLM_MODEL=google/gemini-2.5-pro    # any model on openrouter.ai
+```
+
+**Install the LangChain package for your provider:**
+```bash
+pip install "git-crew[openai]"       # openai / azure / openrouter / together
+pip install "git-crew[anthropic]"
+pip install "git-crew[ollama]"
+pip install "git-crew[mistral]"
+pip install "git-crew[google]"
+pip install "git-crew[all-providers]"  # everything
+```
+
+**In GitHub Actions**, pass the provider and key to the action:
+```yaml
+- uses: yaseen-vm/git-crew@main
+  with:
+    llm-provider: 'anthropic'
+    api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+---
+
 ## SARIF output — GitHub Code Scanning integration
 
 git-crew can export findings in [SARIF 2.1.0](https://sarifweb.azurewebsites.net/) format, the same format used by CodeQL, Snyk, and Semgrep.

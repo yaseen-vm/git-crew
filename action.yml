@@ -10,11 +10,26 @@ branding:
   color: 'purple'
 
 inputs:
-  groq-api-key:
+  llm-provider:
     description: >
-      Groq API key — free at https://console.groq.com.
-      Store as a repository secret named GROQ_API_KEY.
-    required: true
+      LLM provider to use.
+      Supported: groq | openai | anthropic | ollama | azure | mistral | google | openrouter | together
+      Default: groq (free tier available at https://console.groq.com)
+    required: false
+    default: 'groq'
+  llm-model:
+    description: >
+      Override the provider's default model (optional).
+      Example: gpt-4o, claude-3-5-sonnet-20241022, llama-3.3-70b-versatile
+    required: false
+    default: ''
+  api-key:
+    description: >
+      API key for the selected LLM provider.
+      Store it as a repository secret and pass it here.
+      Not needed for LLM_PROVIDER=ollama (local).
+    required: false
+    default: ''
   github-token:
     description: >
       GitHub token for fetching the PR diff and posting the review comment.
@@ -43,12 +58,21 @@ runs:
 
     - name: Install git-crew
       shell: bash
-      run: pip install "${{ github.action_path }}"
+      run: pip install "${{ github.action_path }}[all-providers]"
 
     - name: Run review
       shell: bash
       env:
-        GROQ_API_KEY: ${{ inputs.groq-api-key }}
+        LLM_PROVIDER: ${{ inputs.llm-provider }}
+        LLM_MODEL: ${{ inputs.llm-model }}
+        # Route the single api-key input to the right env var for the chosen provider
+        GROQ_API_KEY: ${{ inputs.llm-provider == 'groq' && inputs.api-key || '' }}
+        OPENAI_API_KEY: ${{ inputs.llm-provider == 'openai' && inputs.api-key || '' }}
+        ANTHROPIC_API_KEY: ${{ inputs.llm-provider == 'anthropic' && inputs.api-key || '' }}
+        MISTRAL_API_KEY: ${{ inputs.llm-provider == 'mistral' && inputs.api-key || '' }}
+        GOOGLE_API_KEY: ${{ inputs.llm-provider == 'google' && inputs.api-key || '' }}
+        OPENROUTER_API_KEY: ${{ inputs.llm-provider == 'openrouter' && inputs.api-key || '' }}
+        TOGETHER_API_KEY: ${{ inputs.llm-provider == 'together' && inputs.api-key || '' }}
         GH_TOKEN: ${{ inputs.github-token }}
         GH_REPO: ${{ github.repository }}
       run: |
