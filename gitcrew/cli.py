@@ -19,33 +19,32 @@ Environment variables required (put in .env or export before running):
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 from dotenv import load_dotenv
 from rich.console import Console
 
-load_dotenv()  # load .env if present
-
 from .git import (
-    get_staged_diff,
-    get_working_tree_diff,
     get_commit_range_diff,
     get_pr_diff,
+    get_staged_diff,
+    get_working_tree_diff,
     parse_diff,
 )
+from .interactive import start_interactive_session
 from .orchestrator import stream_review
 from .report import (
-    print_header,
-    print_step,
-    print_skip_notice,
-    print_report,
-    save_report,
-    save_sarif,
     post_pr_comment,
     print_error,
+    print_header,
+    print_report,
+    print_skip_notice,
+    print_step,
+    save_report,
+    save_sarif,
 )
-from .interactive import start_interactive_session
+
+load_dotenv()  # load .env if present
 
 app = typer.Typer(
     name="git-crew",
@@ -71,7 +70,7 @@ fi
 
 @app.command()
 def review(
-    commit_range: Optional[str] = typer.Argument(
+    commit_range: str | None = typer.Argument(
         None,
         help="Git range to review, e.g. HEAD~3..HEAD or main..feature. "
              "Defaults to staged changes (git diff --cached).",
@@ -80,11 +79,11 @@ def review(
         False, "--unstaged",
         help="Review unstaged working-tree changes instead of staged changes.",
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None, "--output", "-o",
         help="Save the Markdown report to this file.",
     ),
-    sarif: Optional[Path] = typer.Option(
+    sarif: Path | None = typer.Option(
         None, "--sarif",
         help="Save a SARIF 2.1.0 file (for GitHub Code Scanning upload).",
     ),
@@ -139,11 +138,11 @@ def review(
 @app.command()
 def pr(
     pr_number: int = typer.Argument(..., help="GitHub PR number to review."),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None, "--output", "-o",
         help="Save the Markdown report to this file.",
     ),
-    sarif: Optional[Path] = typer.Option(
+    sarif: Path | None = typer.Option(
         None, "--sarif",
         help="Save a SARIF 2.1.0 file (for GitHub Code Scanning upload).",
     ),
@@ -232,11 +231,11 @@ def _run_review_pipeline(
     diff_text: str,
     source_label: str,
     repo_path: str,
-    pr_number: Optional[int],
-    output: Optional[Path],
-    sarif: Optional[Path],
+    pr_number: int | None,
+    output: Path | None,
+    sarif: Path | None,
     no_interactive: bool,
-) -> Optional[dict]:
+) -> dict | None:
     """
     Shared logic for review and pr commands:
       1. Validate diff is non-empty

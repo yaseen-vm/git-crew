@@ -13,9 +13,8 @@ No LLM calls are made here. This module is pure parsing + subprocess.
 
 import re
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-
 
 # ── DiffHunk dataclass ────────────────────────────────────────────────────────
 
@@ -142,14 +141,14 @@ def parse_diff(diff_text: str) -> list[DiffHunk]:
             i += 1
 
             while i < len(lines):
-                l = lines[i]
-                if l.startswith("@@") or l.startswith("diff --git"):
+                raw = lines[i]
+                if raw.startswith("@@") or raw.startswith("diff --git"):
                     break
-                hunk_lines.append(l)
-                if l.startswith("+") and not l.startswith("+++"):
-                    added.append(l[1:])
-                elif l.startswith("-") and not l.startswith("---"):
-                    removed.append(l[1:])
+                hunk_lines.append(raw)
+                if raw.startswith("+") and not raw.startswith("+++"):
+                    added.append(raw[1:])
+                elif raw.startswith("-") and not raw.startswith("---"):
+                    removed.append(raw[1:])
                 i += 1
 
             if added or removed:

@@ -22,16 +22,15 @@ Key design decisions:
     abort the whole review.
 """
 
-from concurrent.futures import ThreadPoolExecutor, Future
-from typing import Optional
+from concurrent.futures import Future, ThreadPoolExecutor
+
+from langgraph.graph import END, StateGraph
 from typing_extensions import TypedDict
 
-from langgraph.graph import StateGraph, END
-
-from .git import diff_summary, parse_diff, format_hunks_for_review, DiffHunk
-from .crews.security_crew import run_security_crew
 from .crews.architecture_crew import run_architecture_crew
 from .crews.performance_crew import run_performance_crew
+from .crews.security_crew import run_security_crew
+from .git import DiffHunk, diff_summary, format_hunks_for_review, parse_diff
 
 
 # ── State schema ──────────────────────────────────────────────────────────────
@@ -40,7 +39,7 @@ class ReviewState(TypedDict):
     # ── Input (set before graph.invoke) ─────────────────────────────────────
     diff_text: str            # raw `git diff` output
     repo_path: str            # path to the repository root (for context messages)
-    pr_number: Optional[int]  # PR number if reviewing a PR, else None
+    pr_number: int | None  # PR number if reviewing a PR, else None
 
     # ── Set by classify node ─────────────────────────────────────────────────
     formatted_diff: str       # format_hunks_for_review() output — sent to crews

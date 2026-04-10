@@ -65,7 +65,7 @@ def _model(provider: str) -> str:
 def _require_key(env_var: str, provider: str) -> str:
     value = os.environ.get(env_var)
     if not value:
-        raise EnvironmentError(
+        raise OSError(
             f"{env_var} is not set.\n"
             f"  LLM_PROVIDER={provider} requires {env_var}.\n"
             f"  Add it to your .env file or export it before running."
@@ -84,7 +84,7 @@ def get_langchain_llm(temperature: float = 0.1):
     and can also be used directly with LangChain chains.
 
     Raises:
-        EnvironmentError: if the required API key is not set
+        OSError: if the required API key is not set
         ValueError: if LLM_PROVIDER is not a recognised provider
         ImportError: if the provider's langchain package is not installed
     """
@@ -169,7 +169,7 @@ def get_autogen_config() -> dict:
     native api_type where AutoGen supports it (e.g. anthropic, azure).
 
     Raises:
-        EnvironmentError: if the required API key is not set
+        OSError: if the required API key is not set
         ValueError: if LLM_PROVIDER is not a recognised provider
     """
     p = _provider()

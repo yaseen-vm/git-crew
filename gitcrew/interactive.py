@@ -23,8 +23,6 @@ Why AutoGen (not CrewAI or LangGraph) for this:
   pattern designed for this: a human and an AI talking back and forth.
 """
 
-from typing import Optional
-
 import autogen
 
 from .llm import get_autogen_config
